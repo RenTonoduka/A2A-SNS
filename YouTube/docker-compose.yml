@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Pipeline Coordinator (Orchestrator)
+  # ============================================
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - AGENT_NAME=coordinator
+      - AGENT_PORT=8100
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/coordinator/server.py
+    networks:
+      - youtube-pipeline
+    depends_on:
+      - research
+      - hook
+      - concept
+      - reviewer
+      - improver
+
+  # ============================================
+  # Research Agent
+  # ============================================
+  research:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8101:8101"
+    environment:
+      - AGENT_NAME=research
+      - AGENT_PORT=8101
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/research/server.py
+    networks:
+      - youtube-pipeline
+
+  # ============================================
+  # Hook Specialist Agent
+  # ============================================
+  hook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8102:8102"
+    environment:
+      - AGENT_NAME=hook
+      - AGENT_PORT=8102
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/hook/server.py
+    networks:
+      - youtube-pipeline
+
+  # ============================================
+  # Video Concept Agent
+  # ============================================
+  concept:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8103:8103"
+    environment:
+      - AGENT_NAME=concept
+      - AGENT_PORT=8103
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/concept/server.py
+    networks:
+      - youtube-pipeline
+
+  # ============================================
+  # Script Reviewer Agent
+  # ============================================
+  reviewer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8104:8104"
+    environment:
+      - AGENT_NAME=reviewer
+      - AGENT_PORT=8104
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/reviewer/server.py
+    networks:
+      - youtube-pipeline
+
+  # ============================================
+  # Script Improver Agent
+  # ============================================
+  improver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8105:8105"
+    environment:
+      - AGENT_NAME=improver
+      - AGENT_PORT=8105
+    volumes:
+      - .:/app/youtube
+      - ../_shared:/app/_shared
+    command: python agents/improver/server.py
+    networks:
+      - youtube-pipeline
+
+networks:
+  youtube-pipeline:
+    driver: bridge

@@ -1,0 +1,79 @@
+# Self Channel Configuration
+# 自チャンネル分析用の設定ファイル
+
+# 自チャンネル情報
+channel_id: ""  # あなたのチャンネルID（UCxxxxxx形式）
+channel_name: ""  # チャンネル名
+
+# 目標設定
+goals:
+  target_subscribers: 10000  # 目標登録者数
+  target_views_per_video: 5000  # 動画あたり目標視聴回数
+  target_pr: 2.0  # 目標Performance Ratio
+  target_engagement_rate: 5.0  # 目標エンゲージメント率（%）
+
+# ニッチ・ジャンル
+niche: "AI・テクノロジー"
+sub_niches:
+  - "AI活用術"
+  - "プログラミング"
+  - "副業・フリーランス"
+
+# 競合チャンネル（ベンチマーク対象）
+competitors:
+  # - "UCxxxxxxx"  # 競合チャンネル1のID
+  # - "UCyyyyyyy"  # 競合チャンネル2のID
+  # - "UCzzzzzzz"  # 競合チャンネル3のID
+
+# モデリング対象（参考にしたいチャンネル）
+role_models:
+  # - "UCxxxxxxx"  # 目標とするチャンネル1
+  # - "UCyyyyyyy"  # 目標とするチャンネル2
+
+# 分析設定
+analysis:
+  # パフォーマンス分析期間（日数）
+  performance_period_days: 30
+
+  # 成功動画の閾値
+  success_pr_threshold: 2.0
+
+  # 弱点検出の閾値
+  weakness_pr_threshold: 1.0
+
+  # 比較対象動画数
+  comparison_video_count: 10
+
+# 通知設定
+notifications:
+  email: "tonoduka@h-bb.jp"
+  # 通知トリガー
+  triggers:
+    - type: "milestone"
+      condition: "subscribers >= 1000"
+    - type: "buzz"
+      condition: "pr >= 5.0"
+    - type: "warning"
+      condition: "pr < 0.5"
+
+# コンテンツ戦略
+content_strategy:
+  # 投稿頻度（週あたり）
+  posts_per_week: 2
+
+  # 最適投稿時間
+  best_posting_times:
+    - day: "Saturday"
+      time: "10:00"
+    - day: "Wednesday"
+      time: "18:00"
+
+  # 動画の長さ目安（分）
+  target_video_length: 15
+
+  # コンテンツ比率
+  content_mix:
+    tutorial: 40  # ハウツー系
+    news: 30      # ニュース・トレンド系
+    review: 20    # レビュー系
+    other: 10     # その他

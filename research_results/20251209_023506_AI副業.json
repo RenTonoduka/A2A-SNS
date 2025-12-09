@@ -1,0 +1,134 @@
+{
+  "theme": "AI副業",
+  "timestamp": "2025-12-09T02:35:06.961937",
+  "keywords": [
+    {
+      "keyword": "AI副業",
+      "search_volume": 100000,
+      "competition": "medium",
+      "opportunity_score": 75,
+      "related_keywords": [
+        "AI 稼ぐ",
+        "ChatGPT 副業",
+        "生成AI ビジネス"
+      ]
+    },
+    {
+      "keyword": "ChatGPT 副業",
+      "search_volume": 100000,
+      "competition": "high",
+      "opportunity_score": 65,
+      "related_keywords": [
+        "ChatGPT 稼ぎ方",
+        "GPT 収入",
+        "AI ライティング"
+      ]
+    },
+    {
+      "keyword": "AI イラスト 副業",
+      "search_volume": 10000,
+      "competition": "medium",
+      "opportunity_score": 70,
+      "related_keywords": [
+        "Midjourney 稼ぐ",
+        "Stable Diffusion 販売",
+        "AI アート NFT"
+      ]
+    },
+    {
+      "keyword": "AI 動画編集 副業",
+      "search_volume": 10000,
+      "competition": "low",
+      "opportunity_score": 80,
+      "related_keywords": [
+        "AI 動画生成",
+        "自動編集",
+        "Runway ML"
+      ]
+    },
+    {
+      "keyword": "AI プログラミング 副業",
+      "search_volume": 10000,
+      "competition": "medium",
+      "opportunity_score": 72,
+      "related_keywords": [
+        "GitHub Copilot",
+        "AI コーディング",
+        "ノーコード AI"
+      ]
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "",
+      "title": "マナブ",
+      "subscriber_count": 100000,
+      "view_count": 0,
+      "video_count": 0,
+      "engagement_rate": 0.0,
+      "opportunity_score": 0.0
+    },
+    {
+      "channel_id": "",
+      "title": "やまもとりゅうけん",
+      "subscriber_count": 100000,
+      "view_count": 0,
+      "video_count": 0,
+      "engagement_rate": 0.0,
+      "opportunity_score": 0.0
+    },
+    {
+      "channel_id": "",
+      "title": "AI SKILL SET",
+      "subscriber_count": 100000,
+      "view_count": 0,
+      "video_count": 0,
+      "engagement_rate": 0.0,
+      "opportunity_score": 0.0
+    },
+    {
+      "channel_id": "",
+      "title": "ウェブ職TV",
+      "subscriber_count": 100000,
+      "view_count": 0,
+      "video_count": 0,
+      "engagement_rate": 0.0,
+      "opportunity_score": 0.0
+    },
+    {
+      "channel_id": "",
+      "title": "AND NOWチャンネル",
+      "subscriber_count": 100000,
+      "view_count": 0,
+      "video_count": 0,
+      "engagement_rate": 0.0,
+      "opportunity_score": 0.0
+    }
+  ],
+  "trends": [
+    "Claude・GPT-4oを使った高単価案件獲得法",
+    "AI自動化で月10万円の不労所得構築",
+    "AIエージェント活用ビジネス",
+    "AI×SNS運用代行",
+    "AIツール比較・レビュー動画",
+    "初心者向けAI副業ロードマップ"
+  ],
+  "content_ideas": [
+    "【2025年最新】AI副業おすすめランキングTOP10｜初心者でも月5万円",
+    "ChatGPT×ライティングで月30万稼ぐ完全ガイド",
+    "AI画像生成で稼ぐ3つの方法｜Midjourney・DALL-E活用術",
+    "【衝撃】AIで動画を自動生成して月収100万円？実態を暴露",
+    "プログラミング未経験でもAIで案件獲得する方法",
+    "AI副業の落とし穴5選｜失敗しないための注意点",
+    "【実演】AIツールだけで1時間でブログ記事10本作成",
+    "AIエージェントで業務自動化｜2025年の新しい稼ぎ方"
+  ],
+  "strategy_suggestions": [
+    "ニッチ特化戦略：AI×特定スキル（例：AI×Webデザイン副業、AI×翻訳副業）に絞って専門性を出す",
+    "実践ドキュメンタリー形式：自身でAI副業を実践し、リアルな収益・プロセスを公開して信頼性を構築",
+    "ツールレビュー×収益化：アフィリエイト可能なAIツールの比較レビュー動画で収益化",
+    "初心者向けロードマップ：AI副業の始め方を体系化したシリーズコンテンツで登録者獲得",
+    "コミュニティ形成：Discord/LINEでAI副業コミュニティを作り、リピーター・高単価商品へ誘導",
+    "ショート動画活用：AI副業のTips・失敗談をYouTubeショートで量産し、チャンネル認知拡大"
+  ]
+}

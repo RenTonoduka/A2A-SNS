@@ -1,0 +1,27 @@
+{
+  "name": "youtube-research",
+  "description": "YouTube競合動画を分析し、参考タイトル・構成パターンを抽出します",
+  "url": "http://localhost:8101",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "competitor-analysis",
+      "name": "競合動画分析",
+      "description": "同テーマの上位動画を分析してパターンを抽出"
+    },
+    {
+      "id": "title-extraction",
+      "name": "参考タイトル抽出",
+      "description": "高パフォーマンス動画のタイトルパターンを抽出"
+    },
+    {
+      "id": "trend-detection",
+      "name": "トレンド検出",
+      "description": "現在のYouTubeトレンドを検出"
+    }
+  ]
+}

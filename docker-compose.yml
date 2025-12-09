@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # SNS Orchestrator
+  # ========================================
+  sns-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python orchestrator/server.py
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - ~/.claude:/root/.claude  # Claude Code認証情報
+    environment:
+      - AGENT_NAME=sns-orchestrator
+      - AGENT_PORT=8080
+    networks:
+      - a2a-network
+
+  # ========================================
+  # YouTube Agents
+  # ========================================
+  youtube-script-writer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python YouTube/script-writer/server.py
+    ports:
+      - "8081:8081"
+    volumes:
+      - .:/app
+      - ~/.claude:/root/.claude
+    environment:
+      - AGENT_NAME=youtube-script-writer
+      - AGENT_PORT=8081
+    networks:
+      - a2a-network
+
+  youtube-shorts-creator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python YouTube/shorts-creator/server.py
+    ports:
+      - "8082:8082"
+    volumes:
+      - .:/app
+      - ~/.claude:/root/.claude
+    environment:
+      - AGENT_NAME=youtube-shorts-creator
+      - AGENT_PORT=8082
+    networks:
+      - a2a-network
+
+  youtube-seo-optimizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python YouTube/seo-optimizer/server.py
+    ports:
+      - "8083:8083"
+    volumes:
+      - .:/app
+      - ~/.claude:/root/.claude
+    environment:
+      - AGENT_NAME=youtube-seo-optimizer
+      - AGENT_PORT=8083
+    networks:
+      - a2a-network
+
+  youtube-thumbnail-planner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python YouTube/thumbnail-planner/server.py
+    ports:
+      - "8084:8084"
+    volumes:
+      - .:/app
+      - ~/.claude:/root/.claude
+    environment:
+      - AGENT_NAME=youtube-thumbnail-planner
+      - AGENT_PORT=8084
+    networks:
+      - a2a-network
+
+networks:
+  a2a-network:
+    driver: bridge

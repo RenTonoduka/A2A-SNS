@@ -1,0 +1,74 @@
+# Agent Metrics
+# 各エージェントのパフォーマンス統計
+
+last_updated: 2025-12-09T20:30:00
+
+agents:
+  research-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "競合動画分析"
+
+  trend-researcher-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "外部トレンド収集"
+
+  video-concept-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "台本コンセプト生成"
+
+  title-strategist-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "タイトル戦略"
+
+  script-reviewer-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "台本評価"
+
+  script-improver-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "台本改善"
+
+  pipeline-coordinator-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "パイプライン統括"
+
+  organization-improver-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "組織改善"
+
+  agent-factory-agent:
+    total_calls: 0
+    success_rate: 0%
+    avg_duration_min: 0
+    is_bottleneck: false
+    notes: "エージェント生成"
+
+# ボトルネック検出閾値
+thresholds:
+  bottleneck_duration_min: 60
+  low_success_rate: 70%
+  high_failure_rate: 30%

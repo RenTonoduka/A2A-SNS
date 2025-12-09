@@ -1,0 +1,52 @@
+# Pipeline Metrics
+# 自動更新されるパイプライン実行メトリクス
+
+last_updated: 2025-12-09T20:30:00
+
+# 全体統計
+summary:
+  total_runs: 0
+  successful_runs: 0  # 90点以上
+  avg_final_score: 0
+  avg_iterations: 0
+  success_rate: 0%
+
+# スコア軸別統計
+score_breakdown:
+  hook:  # フック力
+    max: 25
+    avg: 0
+    min_recorded: 0
+  structure:  # 構成力
+    max: 25
+    avg: 0
+    min_recorded: 0
+  specificity:  # 具体性
+    max: 20
+    avg: 0
+    min_recorded: 0
+  differentiation:  # 差別化
+    max: 15
+    avg: 0
+    min_recorded: 0
+  cta:  # CTA
+    max: 15
+    avg: 0
+    min_recorded: 0
+
+# 失敗パターン
+failure_patterns:
+  weak_hook: 0%
+  lack_of_numbers: 0%
+  no_differentiation: 0%
+  missing_cta: 0%
+  poor_structure: 0%
+
+# 最近の実行履歴
+recent_runs: []
+# 例:
+# - date: 2025-12-09
+#   theme: "AIエージェント"
+#   final_score: 85
+#   iterations: 2
+#   status: success
