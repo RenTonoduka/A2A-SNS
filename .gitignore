@@ -1,7 +1,9 @@
 # Secrets
 _shared/config/.env
-*.env
-.env*
+.env
+.env.local
+.env.production
+!.env.example
 
 # Python
 __pycache__/
@@ -24,5 +26,6 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Claude skills (local only)
-.claude/skills/
+# Claude skills venv (local only)
+.claude/skills/*/.venv/
+YouTube/.claude/skills/*/.venv/
