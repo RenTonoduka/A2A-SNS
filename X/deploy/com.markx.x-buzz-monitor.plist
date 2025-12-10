@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ジョブラベル（一意の識別子） -->
+    <key>Label</key>
+    <string>com.markx.x-buzz-monitor</string>
+
+    <!-- 実行するプログラム -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/tonodukaren/Programming/AI/02_Workspace/03_Markx/40_dev/A2A/SNS/X/auto_monitor.py</string>
+        <string>check</string>
+    </array>
+
+    <!-- 作業ディレクトリ -->
+    <key>WorkingDirectory</key>
+    <string>/Users/tonodukaren/Programming/AI/02_Workspace/03_Markx/40_dev/A2A/SNS/X</string>
+
+    <!-- 定期実行間隔（秒）: 30分 = 1800秒 -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <!-- ログイン時に起動 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 標準出力のログファイル -->
+    <key>StandardOutPath</key>
+    <string>/Users/tonodukaren/Programming/AI/02_Workspace/03_Markx/40_dev/A2A/SNS/X/logs/launchd_stdout.log</string>
+
+    <!-- 標準エラーのログファイル -->
+    <key>StandardErrorPath</key>
+    <string>/Users/tonodukaren/Programming/AI/02_Workspace/03_Markx/40_dev/A2A/SNS/X/logs/launchd_stderr.log</string>
+
+    <!-- 環境変数 -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/tonodukaren/Programming/AI/02_Workspace/03_Markx/40_dev/A2A/SNS/X</string>
+    </dict>
+
+    <!-- エラー時に再起動 -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- CPU/メモリ制限 -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Nice値（低優先度で実行） -->
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
