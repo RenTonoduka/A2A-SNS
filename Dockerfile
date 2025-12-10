@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # アプリケーションコード
 COPY . .
 
+# PYTHONPATHを設定（_sharedモジュールを見つけられるように）
+ENV PYTHONPATH=/app
+
 # デフォルトポート
 EXPOSE 8080
 
