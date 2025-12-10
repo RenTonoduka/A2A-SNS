@@ -2,105 +2,242 @@
 # A2A SNS System - EC2 Production Configuration
 # =============================================================================
 # Usage:
-#   docker-compose -f docker-compose.yml -f docker-compose.ec2.yml up -d
+#   docker-compose -f docker-compose.ec2.yml up -d
+#
+# Or with scheduler:
+#   ENABLE_SCHEDULER=true docker-compose -f docker-compose.ec2.yml up -d
 # =============================================================================
 
 version: '3.8'
 
+x-common-config: &common-config
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+  volumes:
+    - ./YouTube:/app/YouTube:ro
+    - ./_shared:/app/_shared:ro
+    - claude-auth:/root/.claude:ro
+    - ./YouTube/logs:/app/YouTube/logs
+    - ./YouTube/output:/app/YouTube/output
+  environment:
+    - PYTHONUNBUFFERED=1
+    - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+    - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+      reservations:
+        memory: 256M
+
 services:
   # ========================================
-  # SNS Orchestrator (EC2 Override)
+  # Master Coordinator (Port 8099)
   # ========================================
-  sns-orchestrator:
-    restart: unless-stopped
-    volumes:
-      - .:/app:ro  # Read-only for security
-      - claude-auth:/root/.claude:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+  master-coordinator:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/master_coordinator/server.py --port 8099 ${ENABLE_SCHEDULER:+--with-scheduler}
+    ports:
+      - "8099:8099"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - trend-analyzer
+      - research
+      - hook
+      - concept
+      - reviewer
+      - improver
 
   # ========================================
-  # YouTube Agents (EC2 Override)
+  # Phase 1: Data Collection Agents
   # ========================================
-  youtube-script-writer:
-    restart: unless-stopped
-    volumes:
-      - .:/app:ro
-      - claude-auth:/root/.claude:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+  channel-monitor:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/channel_monitor/server.py
+    ports:
+      - "8110:8110"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8110/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  youtube-shorts-creator:
-    restart: unless-stopped
-    volumes:
-      - .:/app:ro
-      - claude-auth:/root/.claude:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+  video-collector:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/video_collector/server.py
+    ports:
+      - "8111:8111"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8111/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  youtube-seo-optimizer:
-    restart: unless-stopped
-    volumes:
-      - .:/app:ro
-      - claude-auth:/root/.claude:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+  trend-analyzer:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/trend_analyzer/server.py
+    ports:
+      - "8112:8112"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8112/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  youtube-thumbnail-planner:
-    restart: unless-stopped
-    volumes:
-      - .:/app:ro
-      - claude-auth:/root/.claude:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+  self-analyzer:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/self_analyzer/server.py
+    ports:
+      - "8114:8114"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8114/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  marketing-analytics:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/marketing_analytics/server.py
+    ports:
+      - "8115:8115"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8115/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  style-learner:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/style_learner/server.py
+    ports:
+      - "8116:8116"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8116/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # Phase 2: Script Generation Agents
+  # ========================================
+  research:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/research/server.py
+    ports:
+      - "8101:8101"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  hook:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/hook/server.py
+    ports:
+      - "8102:8102"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  concept:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/concept/server.py
+    ports:
+      - "8103:8103"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  script-writer:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/script_writer/server.py
+    ports:
+      - "8113:8113"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8113/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # Phase 3-4: Review & Improve Agents
+  # ========================================
+  reviewer:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/reviewer/server.py
+    ports:
+      - "8104:8104"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  improver:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: YouTube/Dockerfile
+    command: python agents/improver/server.py
+    ports:
+      - "8105:8105"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8105/.well-known/agent.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # ========================================
-# Named Volumes for EC2
+# Named Volumes
 # ========================================
 volumes:
   claude-auth:
@@ -109,3 +246,10 @@ volumes:
       type: none
       o: bind
       device: ${HOME}/.claude
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  default:
+    name: a2a-network
