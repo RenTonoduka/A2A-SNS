@@ -1,0 +1,92 @@
+{
+  "description": "監視・抽出対象のXアカウントリスト",
+  "updated_at": "2025-12-11T00:00:00",
+  "accounts": [
+    {
+      "username": "ren_webmarkx",
+      "category": "marketing",
+      "priority": "high",
+      "notes": "自分のアカウント",
+      "enabled": true
+    },
+    {
+      "username": "taishiyade",
+      "category": "ai",
+      "priority": "high",
+      "notes": "",
+      "enabled": true
+    },
+    {
+      "username": "hikarun_videoai",
+      "category": "ai",
+      "priority": "high",
+      "notes": "動画AI系",
+      "enabled": true
+    },
+    {
+      "username": "satori_sz9",
+      "category": "ai",
+      "priority": "high",
+      "notes": "",
+      "enabled": true
+    },
+    {
+      "username": "Majin_AppSheet",
+      "category": "tech",
+      "priority": "high",
+      "notes": "AppSheet/ノーコード系",
+      "enabled": true
+    },
+    {
+      "username": "keitowebai",
+      "category": "ai",
+      "priority": "high",
+      "notes": "Web AI系",
+      "enabled": true
+    },
+    {
+      "username": "labelmake",
+      "category": "tech",
+      "priority": "high",
+      "notes": "",
+      "enabled": true
+    },
+    {
+      "username": "osaruproducer",
+      "category": "marketing",
+      "priority": "high",
+      "notes": "",
+      "enabled": true
+    },
+    {
+      "username": "oikon48",
+      "category": "marketing",
+      "priority": "high",
+      "notes": "",
+      "enabled": true
+    }
+  ],
+  "categories": {
+    "ai": {
+      "description": "AI・機械学習・動画AI系",
+      "buzz_threshold": 500
+    },
+    "tech": {
+      "description": "テクノロジー・ノーコード系",
+      "buzz_threshold": 500
+    },
+    "marketing": {
+      "description": "マーケティング・SNS運用系",
+      "buzz_threshold": 300
+    },
+    "business": {
+      "description": "ビジネス・起業系",
+      "buzz_threshold": 500
+    }
+  },
+  "settings": {
+    "default_max_posts": 50,
+    "default_interval_minutes": 30,
+    "rate_limit_delay_seconds": 5
+  }
+}
