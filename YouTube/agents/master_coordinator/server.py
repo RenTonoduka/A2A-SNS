@@ -21,6 +21,24 @@ sys.path.insert(0, SNS_DIR)
 from _shared.a2a_base_server import A2ABaseServer, TaskSendRequest, Task, Part, Message, TaskStatus, Artifact
 from _shared.a2a_client import A2AClient, AgentRegistry
 
+# 通知システム
+try:
+    from _shared.google_notifier import (
+        notify_buzz_videos,
+        notify_script_completed,
+        notify_pipeline_error,
+        notify,
+        get_notifier
+    )
+    NOTIFIER_AVAILABLE = True
+except ImportError:
+    NOTIFIER_AVAILABLE = False
+
+# 出力ディレクトリ
+OUTPUT_DIR = os.path.join(YOUTUBE_DIR, "output")
+FINAL_DIR = os.path.join(OUTPUT_DIR, "final")
+os.makedirs(FINAL_DIR, exist_ok=True)
+
 # ログ設定
 logging.basicConfig(
     level=logging.INFO,
@@ -356,11 +374,27 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
 3. 推奨テーマ"""
         )
 
-        return {
+        phase1_result = {
             "phase": "1",
             "agent": "trend_analyzer",
             "result": result
         }
+
+        # バズ動画検出時に通知
+        if NOTIFIER_AVAILABLE and self.config.notify_on_buzz:
+            try:
+                buzz_videos = self._extract_buzz_videos_list(phase1_result)
+                if buzz_videos:
+                    notify_result = notify_buzz_videos(
+                        videos=buzz_videos,
+                        threshold=self.config.buzz_threshold
+                    )
+                    logger.info(f"📧 Buzz notification sent: {len(buzz_videos)} videos")
+                    phase1_result["notification"] = notify_result
+            except Exception as e:
+                logger.error(f"❌ Buzz notification failed: {e}")
+
+        return phase1_result
 
     # ==========================================
     # Phase 2: 台本生成
@@ -547,6 +581,45 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
         # 日次カウント更新
         self.daily_script_count += 1
 
+        # 台本をファイルに保存
+        output_file = None
+        if current_script:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_theme = theme.replace("/", "_").replace(" ", "_")[:30] if theme else "unknown"
+            output_file = os.path.join(FINAL_DIR, f"{timestamp}_{safe_theme}_{final_score}pts.md")
+            try:
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    f.write(f"# {theme}\n\n")
+                    f.write(f"**スコア**: {final_score}/100\n")
+                    f.write(f"**生成日時**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"**イテレーション**: {iteration}回\n\n")
+                    f.write("---\n\n")
+                    f.write(current_script)
+                logger.info(f"📁 Script saved: {output_file}")
+                pipeline_result["output_file"] = output_file
+            except Exception as e:
+                logger.error(f"❌ Failed to save script: {e}")
+
+        # 通知送信（Gmail + Google Docs情報）
+        if NOTIFIER_AVAILABLE and self.config.notify_on_complete:
+            try:
+                # バズ動画情報を抽出（Phase 1から）
+                buzz_video = self._extract_buzz_video_from_phase1(phase1)
+
+                # 台本完成通知（メール送信 + Google Docs作成情報）
+                notify_result = notify_script_completed(
+                    theme=theme,
+                    score=final_score,
+                    output_file=output_file,
+                    buzz_video=buzz_video,
+                    include_script_content=True
+                )
+                logger.info(f"📧 Notification sent: {notify_result.get('email', {})}")
+                pipeline_result["notification"] = notify_result
+            except Exception as e:
+                logger.error(f"❌ Notification failed: {e}")
+                pipeline_result["notification_error"] = str(e)
+
         logger.info(f"🎉 Pipeline completed! Score: {final_score}, Iterations: {iteration}")
 
         return pipeline_result
@@ -600,6 +673,77 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
         except:
             pass
         return None
+
+    def _extract_buzz_video_from_phase1(self, phase1_result: Dict) -> Optional[Dict]:
+        """Phase 1結果からバズ動画情報を抽出"""
+        try:
+            text = self._extract_text(phase1_result.get("result", {}))
+            import re
+
+            # タイトルを探す
+            title_match = re.search(r'タイトル[：:]\s*(.+?)(?:\n|$)', text)
+            title = title_match.group(1).strip() if title_match else None
+
+            # チャンネル名を探す
+            channel_match = re.search(r'チャンネル[：:]\s*(.+?)(?:\n|$)', text)
+            channel = channel_match.group(1).strip() if channel_match else None
+
+            # PRを探す
+            pr_match = re.search(r'PR[：:\s]*(\d+\.?\d*)', text)
+            pr = float(pr_match.group(1)) if pr_match else 0
+
+            # 再生数を探す
+            views_match = re.search(r'再生[数回][：:\s]*([0-9,]+)', text)
+            views = int(views_match.group(1).replace(',', '')) if views_match else 0
+
+            # video_idを探す
+            vid_match = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})', text)
+            video_id = vid_match.group(1) if vid_match else None
+
+            if title or video_id:
+                return {
+                    "title": title or "不明",
+                    "channel_name": channel or "不明",
+                    "performance_ratio": pr,
+                    "view_count": views,
+                    "video_id": video_id or ""
+                }
+        except Exception as e:
+            logger.warning(f"Failed to extract buzz video: {e}")
+        return None
+
+    def _extract_buzz_videos_list(self, phase1_result: Dict) -> List[Dict]:
+        """Phase 1結果からバズ動画リストを抽出"""
+        videos = []
+        try:
+            text = self._extract_text(phase1_result.get("result", {}))
+            import re
+
+            # JSONブロックを探す
+            json_match = re.search(r'\[[\s\S]*?\]', text)
+            if json_match:
+                try:
+                    videos = json.loads(json_match.group(0))
+                except:
+                    pass
+
+            # JSONが見つからない場合、テキストからパース
+            if not videos:
+                # 「【N位】」パターンで分割
+                blocks = re.split(r'【\d+位】', text)
+                for block in blocks[1:]:  # 最初の空ブロックをスキップ
+                    video = {}
+                    title_match = re.search(r'タイトル[：:]\s*(.+?)(?:\n|$)', block)
+                    if title_match:
+                        video["title"] = title_match.group(1).strip()
+                    pr_match = re.search(r'PR[：:\s]*(\d+\.?\d*)', block)
+                    if pr_match:
+                        video["pr"] = float(pr_match.group(1))
+                    if video:
+                        videos.append(video)
+        except Exception as e:
+            logger.warning(f"Failed to extract buzz videos list: {e}")
+        return videos
 
     # ==========================================
     # タスクハンドリング（A2Aオーバーライド）
