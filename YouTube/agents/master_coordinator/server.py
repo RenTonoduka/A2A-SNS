@@ -142,9 +142,16 @@ class MasterCoordinator(A2ABaseServer):
         self.daily_script_count = 0
         self.last_reset_date = datetime.now().date()
         self.running = False
+        self._scheduler_enabled = False  # 起動時に設定
 
         # 追加ルート
         self._setup_orchestrator_routes()
+
+        # FastAPI起動時にスケジューラを開始
+        @self.app.on_event("startup")
+        async def on_startup():
+            if self._scheduler_enabled:
+                self.start_scheduler()
 
     def _register_agents(self):
         """エージェントを登録"""
@@ -965,6 +972,6 @@ if __name__ == "__main__":
     print("=" * 60)
 
     if args.with_scheduler:
-        coordinator.start_scheduler()
+        coordinator._scheduler_enabled = True
 
     coordinator.run()

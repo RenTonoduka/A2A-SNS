@@ -12,6 +12,13 @@ from datetime import datetime
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
+# Stealth mode for bot detection bypass
+try:
+    from playwright_stealth import stealth_async
+    STEALTH_AVAILABLE = True
+except ImportError:
+    STEALTH_AVAILABLE = False
+
 from config import SESSION_DIR, BrowserConfig, LOGS_DIR
 
 # ログ設定
@@ -93,6 +100,12 @@ class SessionManager:
             )
 
         self.page = await self.context.new_page()
+
+        # Apply stealth mode to bypass bot detection
+        if STEALTH_AVAILABLE:
+            await stealth_async(self.page)
+            logger.info("🥷 Stealth mode enabled")
+
         return self
 
     async def stop(self):
@@ -159,8 +172,8 @@ class SessionManager:
             return False
 
         try:
-            await self.page.goto(self.X_URL, wait_until="networkidle")
-            await asyncio.sleep(2)
+            await self.page.goto(self.X_URL, wait_until="domcontentloaded", timeout=60000)
+            await asyncio.sleep(5)  # ページ読み込み待ち
 
             # ログインしているかどうかをチェック
             # ホームタイムラインやプロフィールアイコンの存在で判定
