@@ -1,5 +1,9 @@
 # Secrets
 _shared/config/.env
+_shared/config/token.pickle
+_shared/config/credentials.json
+*.pickle
+credentials.json
 .env
 .env.local
 .env.production
