@@ -39,7 +39,7 @@ echo ""
 echo "━━━ Master Coordinator ━━━"
 if [ "$WITH_SCHEDULER" = true ]; then
     echo "🎬 Starting Master Coordinator on port 8099 (with scheduler)..."
-    python agents/master_coordinator/server.py --port 8099 --with-scheduler > logs/master_coordinator.log 2>&1 &
+    ENABLE_SCHEDULER=1 python agents/master_coordinator/server.py --port 8099 --with-scheduler > logs/master_coordinator.log 2>&1 &
 else
     echo "🎬 Starting Master Coordinator on port 8099..."
     python agents/master_coordinator/server.py --port 8099 > logs/master_coordinator.log 2>&1 &
