@@ -382,108 +382,135 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
             "steps": {}
         }
 
-        # Step 1: Video Collector でAPIからデータを更新
-        logger.info("  └─ Step 1: video_collector でデータ更新...")
-        collect_result = await self.call_agent(
-            "video_collector",
-            f"""全チャンネルの動画データを更新してください。
+        # Step 1: 直接Pythonでデータ更新（APIを叩く）
+        logger.info("  └─ Step 1: YouTube APIからデータ更新...")
+        try:
+            import sys
+            research_dir = os.path.join(YOUTUBE_DIR, "research")
+            sys.path.insert(0, research_dir)
+            from channel_manager import ChannelManager
 
-以下のコマンドを実行:
-```bash
-cd research && python channel_manager.py fetch --top 20 --force
-```
+            manager = ChannelManager()
+            fetch_result = manager.fetch_all_channels(top_n=20, force=False)  # キャッシュ期間内はスキップ
+            updated_channels = len(fetch_result)
+            logger.info(f"  └─ Updated {updated_channels} channels from API")
 
-または以下のPythonコードを実行:
-```python
-import sys
-sys.path.insert(0, 'research')
-from channel_manager import ChannelManager
+            phase1_result["steps"]["api_fetch"] = {
+                "status": "success",
+                "channels_updated": updated_channels
+            }
+        except Exception as e:
+            logger.error(f"  └─ API fetch failed: {e}")
+            phase1_result["steps"]["api_fetch"] = {
+                "status": "error",
+                "error": str(e)
+            }
 
-manager = ChannelManager()
-result = manager.fetch_all_channels(top_n=20, force=True)
-print(f"Updated {{len(result)}} channels")
-```
+        # Step 2: 直接Pythonでバズ動画を検出
+        logger.info("  └─ Step 2: バズ動画検出...")
+        try:
+            outstanding = manager.find_outstanding_videos(
+                threshold=self.config.buzz_threshold,
+                min_views=self.config.buzz_min_views
+            )
 
-完了後、更新件数を報告してください。"""
-        )
-        phase1_result["steps"]["video_collector"] = collect_result
+            # 直近N日でフィルタ
+            from datetime import datetime, timedelta
+            cutoff = datetime.now() - timedelta(days=self.config.buzz_days)
+            recent_buzz = []
+            for v in outstanding:
+                try:
+                    pub_date = datetime.fromisoformat(v.published_at.replace('Z', '+00:00').replace('+00:00', ''))
+                    if pub_date >= cutoff:
+                        recent_buzz.append(v)
+                except:
+                    recent_buzz.append(v)  # パース失敗は含める
 
-        # Step 2: Trend Analyzer でバズ動画を分析
-        logger.info("  └─ Step 2: trend_analyzer でバズ分析...")
-        result = await self.call_agent(
-            "trend_analyzer",
-            f"""バズ動画を検出してください。
+            buzz_videos = []
+            for v in recent_buzz[:10]:
+                buzz_videos.append({
+                    "video_id": v.video_id,
+                    "title": v.title,
+                    "channel_name": v.channel_name,
+                    "view_count": v.view_count,
+                    "performance_ratio": v.performance_ratio,
+                    "published_at": v.published_at
+                })
+                logger.info(f"    🔥 PR={v.performance_ratio:.1f}x | {v.title[:40]}")
 
-条件:
-- PR（performance_ratio）>= {self.config.buzz_threshold}
-- 再生数 >= {self.config.buzz_min_views:,}
-- 直近{self.config.buzz_days}日間
+            phase1_result["steps"]["buzz_detection"] = {
+                "status": "success",
+                "total_outstanding": len(outstanding),
+                "recent_buzz_count": len(recent_buzz),
+                "buzz_videos": buzz_videos
+            }
 
-以下のコマンドで検出:
-```bash
-cd research && python channel_manager.py outstanding --threshold {self.config.buzz_threshold}
-```
+            logger.info(f"  └─ Found {len(buzz_videos)} buzz videos (PR >= {self.config.buzz_threshold})")
 
-または以下のPythonコードを実行:
-```python
-import sys
-sys.path.insert(0, 'research')
-from channel_manager import ChannelManager
+        except Exception as e:
+            logger.error(f"  └─ Buzz detection failed: {e}")
+            phase1_result["steps"]["buzz_detection"] = {
+                "status": "error",
+                "error": str(e)
+            }
+            buzz_videos = []
 
-manager = ChannelManager()
-outstanding = manager.find_outstanding_videos(
-    threshold={self.config.buzz_threshold},
-    min_views={self.config.buzz_min_views}
-)
-for v in outstanding[:10]:
-    print(f"PR={{v.performance_ratio:.1f}}x | {{v.title[:50]}}")
-    print(f"  Channel: {{v.channel_name}} | Views: {{v.view_count:,}}")
-```
+        # Step 3: trend_analyzer に分析を依頼（オプション：推奨テーマ生成）
+        if buzz_videos:
+            logger.info("  └─ Step 3: trend_analyzer でトレンド分析...")
+            buzz_summary = "\n".join([
+                f"- {v['title'][:50]} (PR={v['performance_ratio']:.1f}x, {v['view_count']:,}再生)"
+                for v in buzz_videos[:5]
+            ])
+            result = await self.call_agent(
+                "trend_analyzer",
+                f"""以下のバズ動画を分析し、推奨テーマを提案してください：
+
+{buzz_summary}
 
 出力形式:
-1. バズ動画リスト（最大10件）
-2. トレンドキーワード
-3. 推奨テーマ"""
-        )
-
-        phase1_result["agent"] = "trend_analyzer"
-        phase1_result["result"] = result
+1. トレンドキーワード（3-5個）
+2. 推奨テーマ（台本生成用）
+3. 成功要因の分析"""
+            )
+            phase1_result["agent"] = "trend_analyzer"
+            phase1_result["result"] = result
+        else:
+            phase1_result["result"] = {"message": "No buzz videos found"}
 
         # バズ動画検出時に通知（MCP経由 + フォールバック）
-        if self.config.notify_on_buzz:
+        if self.config.notify_on_buzz and buzz_videos:
             try:
-                buzz_videos = self._extract_buzz_videos_list(phase1_result)
-                if buzz_videos:
-                    # MCP経由で通知準備（推奨）
-                    if MCP_NOTIFIER_AVAILABLE:
-                        mcp_data = prepare_buzz_detection_email(
-                            videos=buzz_videos,
-                            threshold=self.config.buzz_threshold
-                        )
-                        # MCPコマンドをJSONファイルとして保存
-                        mcp_json_file = os.path.join(
-                            OUTPUT_DIR,
-                            f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_buzz_email.json"
-                        )
-                        with open(mcp_json_file, 'w', encoding='utf-8') as f:
-                            json.dump(mcp_data['mcp_params'], f, ensure_ascii=False, indent=2)
+                # MCP経由で通知準備（推奨）
+                if MCP_NOTIFIER_AVAILABLE:
+                    mcp_data = prepare_buzz_detection_email(
+                        videos=buzz_videos,
+                        threshold=self.config.buzz_threshold
+                    )
+                    # MCPコマンドをJSONファイルとして保存
+                    mcp_json_file = os.path.join(
+                        OUTPUT_DIR,
+                        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_buzz_email.json"
+                    )
+                    with open(mcp_json_file, 'w', encoding='utf-8') as f:
+                        json.dump(mcp_data['mcp_params'], f, ensure_ascii=False, indent=2)
 
-                        logger.info(f"📄 Buzz MCP notification prepared: {mcp_json_file}")
-                        phase1_result["notification"] = {
-                            "type": "mcp",
-                            "status": "prepared",
-                            "file": mcp_json_file,
-                            "video_count": len(buzz_videos)
-                        }
+                    logger.info(f"📄 Buzz MCP notification prepared: {mcp_json_file}")
+                    phase1_result["notification"] = {
+                        "type": "mcp",
+                        "status": "prepared",
+                        "file": mcp_json_file,
+                        "video_count": len(buzz_videos)
+                    }
 
-                    # Google OAuth認証フォールバック
-                    elif NOTIFIER_AVAILABLE:
-                        notify_result = notify_buzz_videos(
-                            videos=buzz_videos,
-                            threshold=self.config.buzz_threshold
-                        )
-                        logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
-                        phase1_result["notification"] = notify_result
+                # Google OAuth認証フォールバック
+                elif NOTIFIER_AVAILABLE:
+                    notify_result = notify_buzz_videos(
+                        videos=buzz_videos,
+                        threshold=self.config.buzz_threshold
+                    )
+                    logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
+                    phase1_result["notification"] = notify_result
             except Exception as e:
                 logger.error(f"❌ Buzz notification failed: {e}")
 
