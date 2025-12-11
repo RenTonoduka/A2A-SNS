@@ -21,7 +21,7 @@ sys.path.insert(0, SNS_DIR)
 from _shared.a2a_base_server import A2ABaseServer, TaskSendRequest, Task, Part, Message, TaskStatus, Artifact
 from _shared.a2a_client import A2AClient, AgentRegistry
 
-# 通知システム
+# 通知システム（Google OAuth - フォールバック用）
 try:
     from _shared.google_notifier import (
         notify_buzz_videos,
@@ -33,6 +33,18 @@ try:
     NOTIFIER_AVAILABLE = True
 except ImportError:
     NOTIFIER_AVAILABLE = False
+
+# MCP経由通知（OAuth不要 - 推奨）
+try:
+    from _shared.mcp_email_sender import (
+        prepare_script_completion_email,
+        prepare_buzz_detection_email,
+        prepare_script_with_doc_and_email,
+        NOTIFY_EMAIL
+    )
+    MCP_NOTIFIER_AVAILABLE = True
+except ImportError:
+    MCP_NOTIFIER_AVAILABLE = False
 
 # 出力ディレクトリ
 OUTPUT_DIR = os.path.join(YOUTUBE_DIR, "output")
@@ -380,17 +392,41 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
             "result": result
         }
 
-        # バズ動画検出時に通知
-        if NOTIFIER_AVAILABLE and self.config.notify_on_buzz:
+        # バズ動画検出時に通知（MCP経由 + フォールバック）
+        if self.config.notify_on_buzz:
             try:
                 buzz_videos = self._extract_buzz_videos_list(phase1_result)
                 if buzz_videos:
-                    notify_result = notify_buzz_videos(
-                        videos=buzz_videos,
-                        threshold=self.config.buzz_threshold
-                    )
-                    logger.info(f"📧 Buzz notification sent: {len(buzz_videos)} videos")
-                    phase1_result["notification"] = notify_result
+                    # MCP経由で通知準備（推奨）
+                    if MCP_NOTIFIER_AVAILABLE:
+                        mcp_data = prepare_buzz_detection_email(
+                            videos=buzz_videos,
+                            threshold=self.config.buzz_threshold
+                        )
+                        # MCPコマンドをJSONファイルとして保存
+                        mcp_json_file = os.path.join(
+                            OUTPUT_DIR,
+                            f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_buzz_email.json"
+                        )
+                        with open(mcp_json_file, 'w', encoding='utf-8') as f:
+                            json.dump(mcp_data['mcp_params'], f, ensure_ascii=False, indent=2)
+
+                        logger.info(f"📄 Buzz MCP notification prepared: {mcp_json_file}")
+                        phase1_result["notification"] = {
+                            "type": "mcp",
+                            "status": "prepared",
+                            "file": mcp_json_file,
+                            "video_count": len(buzz_videos)
+                        }
+
+                    # Google OAuth認証フォールバック
+                    elif NOTIFIER_AVAILABLE:
+                        notify_result = notify_buzz_videos(
+                            videos=buzz_videos,
+                            threshold=self.config.buzz_threshold
+                        )
+                        logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
+                        phase1_result["notification"] = notify_result
             except Exception as e:
                 logger.error(f"❌ Buzz notification failed: {e}")
 
@@ -600,22 +636,55 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
             except Exception as e:
                 logger.error(f"❌ Failed to save script: {e}")
 
-        # 通知送信（Gmail + Google Docs情報）
-        if NOTIFIER_AVAILABLE and self.config.notify_on_complete:
+        # 通知送信（MCP経由 + フォールバック）
+        if self.config.notify_on_complete and output_file:
             try:
                 # バズ動画情報を抽出（Phase 1から）
                 buzz_video = self._extract_buzz_video_from_phase1(phase1)
 
-                # 台本完成通知（メール送信 + Google Docs作成情報）
-                notify_result = notify_script_completed(
-                    theme=theme,
-                    score=final_score,
-                    output_file=output_file,
-                    buzz_video=buzz_video,
-                    include_script_content=True
-                )
-                logger.info(f"📧 Notification sent: {notify_result.get('email', {})}")
-                pipeline_result["notification"] = notify_result
+                # MCP経由で通知準備（推奨 - OAuth不要）
+                if MCP_NOTIFIER_AVAILABLE:
+                    # Google Docs作成 + メール送信の準備
+                    mcp_data = prepare_script_with_doc_and_email(
+                        theme=theme,
+                        score=final_score,
+                        output_file=output_file,
+                        buzz_video=buzz_video
+                    )
+
+                    # MCPコマンドをJSONファイルとして保存
+                    mcp_json_file = os.path.join(
+                        OUTPUT_DIR,
+                        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{theme[:20].replace('/', '_')}_mcp.json"
+                    )
+                    with open(mcp_json_file, 'w', encoding='utf-8') as f:
+                        json.dump({
+                            "google_doc": mcp_data['google_doc']['mcp_params'],
+                            "email": mcp_data['email']['mcp_params']
+                        }, f, ensure_ascii=False, indent=2)
+
+                    logger.info(f"📄 MCP notification prepared: {mcp_json_file}")
+                    pipeline_result["mcp_notification_file"] = mcp_json_file
+                    pipeline_result["notification"] = {
+                        "type": "mcp",
+                        "status": "prepared",
+                        "file": mcp_json_file,
+                        "google_doc_title": mcp_data['google_doc']['title'],
+                        "email_subject": mcp_data['email']['subject']
+                    }
+
+                # Google OAuth認証フォールバック
+                elif NOTIFIER_AVAILABLE:
+                    notify_result = notify_script_completed(
+                        theme=theme,
+                        score=final_score,
+                        output_file=output_file,
+                        buzz_video=buzz_video,
+                        include_script_content=True
+                    )
+                    logger.info(f"📧 OAuth notification sent: {notify_result.get('email', {})}")
+                    pipeline_result["notification"] = notify_result
+
             except Exception as e:
                 logger.error(f"❌ Notification failed: {e}")
                 pipeline_result["notification_error"] = str(e)
