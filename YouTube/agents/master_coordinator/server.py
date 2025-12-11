@@ -46,6 +46,14 @@ try:
 except ImportError:
     MCP_NOTIFIER_AVAILABLE = False
 
+# Google Sheets ロガー
+try:
+    sys.path.insert(0, YOUTUBE_DIR)
+    from sheets_logger import get_sheets_logger, YouTubeSheetsLogger
+    SHEETS_LOGGER_AVAILABLE = True
+except ImportError:
+    SHEETS_LOGGER_AVAILABLE = False
+
 # 出力ディレクトリ
 OUTPUT_DIR = os.path.join(YOUTUBE_DIR, "output")
 FINAL_DIR = os.path.join(OUTPUT_DIR, "final")
@@ -513,6 +521,49 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
                     phase1_result["notification"] = notify_result
             except Exception as e:
                 logger.error(f"❌ Buzz notification failed: {e}")
+
+        # Step 4: Google Sheetsに出力（バズ動画 + CSV全体）
+        if SHEETS_LOGGER_AVAILABLE:
+            try:
+                logger.info("  └─ Step 4: Google Sheetsに出力...")
+                sheets_logger = get_sheets_logger()
+
+                # バズ動画を記録
+                if buzz_videos:
+                    logged_count = sheets_logger.log_buzz_videos(buzz_videos)
+                    logger.info(f"    📊 {logged_count} new buzz videos logged to sheets cache")
+
+                # videos.csvの全データをインポート
+                csv_path = os.path.join(YOUTUBE_DIR, "research", "data", "videos.csv")
+                video_count = sheets_logger.log_all_videos_from_csv(csv_path)
+                logger.info(f"    📊 {video_count} videos imported from CSV")
+
+                # MCPパラメータをJSONファイルとして保存（後でMCP実行時に使用）
+                buzz_params = sheets_logger.sync_buzz_to_sheets()
+                videos_params = sheets_logger.sync_videos_to_sheets()
+
+                sheets_json_file = os.path.join(
+                    OUTPUT_DIR,
+                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_sheets_update.json"
+                )
+                with open(sheets_json_file, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "buzz_videos": buzz_params,
+                        "all_videos": videos_params,
+                        "timestamp": datetime.now().isoformat()
+                    }, f, ensure_ascii=False, indent=2)
+
+                logger.info(f"    📄 Sheets update params saved: {sheets_json_file}")
+                phase1_result["sheets"] = {
+                    "status": "prepared",
+                    "file": sheets_json_file,
+                    "buzz_count": len(buzz_videos) if buzz_videos else 0,
+                    "total_videos": video_count
+                }
+
+            except Exception as e:
+                logger.error(f"❌ Sheets logging failed: {e}")
+                phase1_result["sheets"] = {"status": "error", "error": str(e)}
 
         return phase1_result
 
