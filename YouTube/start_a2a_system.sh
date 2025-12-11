@@ -39,10 +39,10 @@ echo ""
 echo "━━━ Master Coordinator ━━━"
 if [ "$WITH_SCHEDULER" = true ]; then
     echo "🎬 Starting Master Coordinator on port 8099 (with scheduler)..."
-    ENABLE_SCHEDULER=1 python agents/master_coordinator/server.py --port 8099 --with-scheduler > logs/master_coordinator.log 2>&1 &
+    ENABLE_SCHEDULER=1 python3 agents/master_coordinator/server.py --port 8099 --with-scheduler > logs/master_coordinator.log 2>&1 &
 else
     echo "🎬 Starting Master Coordinator on port 8099..."
-    python agents/master_coordinator/server.py --port 8099 > logs/master_coordinator.log 2>&1 &
+    python3 agents/master_coordinator/server.py --port 8099 > logs/master_coordinator.log 2>&1 &
 fi
 echo $! > logs/master_coordinator.pid
 sleep 2
@@ -61,32 +61,32 @@ echo ""
 echo "━━━ Phase 1: Data Collection ━━━"
 
 echo "👀 Starting Channel Monitor Agent on port 8110..."
-python agents/channel_monitor/server.py > logs/channel_monitor.log 2>&1 &
+python3 agents/channel_monitor/server.py > logs/channel_monitor.log 2>&1 &
 echo $! > logs/channel_monitor.pid
 sleep 1
 
 echo "📹 Starting Video Collector Agent on port 8111..."
-python agents/video_collector/server.py > logs/video_collector.log 2>&1 &
+python3 agents/video_collector/server.py > logs/video_collector.log 2>&1 &
 echo $! > logs/video_collector.pid
 sleep 1
 
 echo "📊 Starting Trend Analyzer Agent on port 8112..."
-python agents/trend_analyzer/server.py > logs/trend_analyzer.log 2>&1 &
+python3 agents/trend_analyzer/server.py > logs/trend_analyzer.log 2>&1 &
 echo $! > logs/trend_analyzer.pid
 sleep 1
 
 echo "📈 Starting Self Analyzer Agent on port 8114..."
-python agents/self_analyzer/server.py > logs/self_analyzer.log 2>&1 &
+python3 agents/self_analyzer/server.py > logs/self_analyzer.log 2>&1 &
 echo $! > logs/self_analyzer.pid
 sleep 1
 
 echo "📊 Starting Marketing Analytics Agent on port 8115..."
-python agents/marketing_analytics/server.py > logs/marketing_analytics.log 2>&1 &
+python3 agents/marketing_analytics/server.py > logs/marketing_analytics.log 2>&1 &
 echo $! > logs/marketing_analytics.pid
 sleep 1
 
 echo "🎨 Starting Style Learner Agent on port 8116..."
-python agents/style_learner/server.py > logs/style_learner.log 2>&1 &
+python3 agents/style_learner/server.py > logs/style_learner.log 2>&1 &
 echo $! > logs/style_learner.pid
 sleep 1
 
@@ -97,22 +97,22 @@ echo ""
 echo "━━━ Phase 2: Script Generation ━━━"
 
 echo "🔍 Starting Research Agent on port 8101..."
-python agents/research/server.py > logs/research.log 2>&1 &
+python3 agents/research/server.py > logs/research.log 2>&1 &
 echo $! > logs/research.pid
 sleep 1
 
 echo "🪝 Starting Hook Agent on port 8102..."
-python agents/hook/server.py > logs/hook.log 2>&1 &
+python3 agents/hook/server.py > logs/hook.log 2>&1 &
 echo $! > logs/hook.pid
 sleep 1
 
 echo "💡 Starting Concept Agent on port 8103..."
-python agents/concept/server.py > logs/concept.log 2>&1 &
+python3 agents/concept/server.py > logs/concept.log 2>&1 &
 echo $! > logs/concept.pid
 sleep 1
 
 echo "✍️ Starting Script Writer Agent on port 8113..."
-python agents/script_writer/server.py > logs/script_writer.log 2>&1 &
+python3 agents/script_writer/server.py > logs/script_writer.log 2>&1 &
 echo $! > logs/script_writer.pid
 sleep 1
 
@@ -123,12 +123,12 @@ echo ""
 echo "━━━ Phase 3-4: Review & Improve ━━━"
 
 echo "📝 Starting Reviewer Agent on port 8104..."
-python agents/reviewer/server.py > logs/reviewer.log 2>&1 &
+python3 agents/reviewer/server.py > logs/reviewer.log 2>&1 &
 echo $! > logs/reviewer.pid
 sleep 1
 
 echo "🔧 Starting Improver Agent on port 8105..."
-python agents/improver/server.py > logs/improver.log 2>&1 &
+python3 agents/improver/server.py > logs/improver.log 2>&1 &
 echo $! > logs/improver.pid
 sleep 1
 
