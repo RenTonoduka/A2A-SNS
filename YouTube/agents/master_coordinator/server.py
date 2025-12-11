@@ -955,13 +955,17 @@ if __name__ == "__main__":
     parser.add_argument("--with-scheduler", action="store_true", help="Start with scheduler")
     args = parser.parse_args()
 
+    # 環境変数でもスケジューラ有効化可能（SSH経由での引数問題回避）
+    enable_scheduler = args.with_scheduler or os.environ.get("ENABLE_SCHEDULER", "").lower() in ("1", "true", "yes")
+
     coordinator = MasterCoordinator(port=args.port)
 
     print("=" * 60)
     print("🎬 Master Coordinator Agent")
     print("=" * 60)
     print(f"  Port: {args.port}")
-    print(f"  Scheduler: {'Enabled' if args.with_scheduler else 'Disabled'}")
+    print(f"  Scheduler: {'Enabled' if enable_scheduler else 'Disabled'}")
+    print(f"  (env ENABLE_SCHEDULER={os.environ.get('ENABLE_SCHEDULER', 'not set')})")
     print("")
     print("Endpoints:")
     print(f"  GET  /.well-known/agent.json  - Agent Card")
@@ -971,7 +975,7 @@ if __name__ == "__main__":
     print(f"  POST /trigger/full-pipeline   - Manual Full Pipeline")
     print("=" * 60)
 
-    if args.with_scheduler:
+    if enable_scheduler:
         coordinator._scheduler_enabled = True
 
     coordinator.run()
