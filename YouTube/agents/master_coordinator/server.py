@@ -60,6 +60,9 @@ OUTPUT_DIR = os.path.join(YOUTUBE_DIR, "output")
 FINAL_DIR = os.path.join(OUTPUT_DIR, "final")
 os.makedirs(FINAL_DIR, exist_ok=True)
 
+# 通知済みバズ動画追跡ファイル
+NOTIFIED_VIDEOS_FILE = os.path.join(OUTPUT_DIR, "notified_videos.json")
+
 # ログ設定
 logging.basicConfig(
     level=logging.INFO,
@@ -154,6 +157,9 @@ class MasterCoordinator(A2ABaseServer):
         self._scheduler_enabled = False  # 起動時に設定
         self._pipeline_lock = asyncio.Lock()  # 並列実行防止
 
+        # 通知済みバズ動画追跡
+        self._notified_videos = self._load_notified_videos()
+
         # 追加ルート
         self._setup_orchestrator_routes()
 
@@ -180,6 +186,49 @@ class MasterCoordinator(A2ABaseServer):
         """エージェントを登録"""
         for name, url in self.AGENTS.items():
             self.registry.register(name, url)
+
+    def _load_notified_videos(self) -> Dict[str, str]:
+        """通知済みバズ動画を読み込み（video_id -> 通知日時）"""
+        try:
+            if os.path.exists(NOTIFIED_VIDEOS_FILE):
+                with open(NOTIFIED_VIDEOS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # 30日以上前の通知は削除（メモリ節約）
+                    from datetime import timedelta
+                    cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+                    return {k: v for k, v in data.items() if v > cutoff}
+        except Exception as e:
+            logger.warning(f"Failed to load notified videos: {e}")
+        return {}
+
+    def _save_notified_videos(self):
+        """通知済みバズ動画を保存"""
+        try:
+            with open(NOTIFIED_VIDEOS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self._notified_videos, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save notified videos: {e}")
+
+    def _filter_new_buzz_videos(self, buzz_videos: List[Dict]) -> List[Dict]:
+        """未通知のバズ動画のみをフィルタリング"""
+        new_videos = []
+        for video in buzz_videos:
+            video_id = video.get("video_id")
+            if video_id and video_id not in self._notified_videos:
+                new_videos.append(video)
+            else:
+                logger.info(f"⏭️ Skipped already notified: {video.get('title', video_id)[:40]}")
+        return new_videos
+
+    def _mark_videos_as_notified(self, buzz_videos: List[Dict]):
+        """バズ動画を通知済みとしてマーク"""
+        now = datetime.now().isoformat()
+        for video in buzz_videos:
+            video_id = video.get("video_id")
+            if video_id:
+                self._notified_videos[video_id] = now
+        self._save_notified_videos()
+        logger.info(f"📝 Marked {len(buzz_videos)} videos as notified")
 
     def _setup_orchestrator_routes(self):
         """オーケストレーター専用ルート"""
@@ -521,12 +570,22 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
             phase1_result["result"] = {"message": "No buzz videos found"}
 
         # バズ動画検出時に通知（MCP準備 + OAuth送信）
-        if self.config.notify_on_buzz and buzz_videos:
+        # 新規バズ動画のみをフィルタリング（重複通知防止）
+        new_buzz_videos = self._filter_new_buzz_videos(buzz_videos) if buzz_videos else []
+
+        logger.info(f"📊 Buzz videos: {len(buzz_videos)} total, {len(new_buzz_videos)} new (not notified)")
+        phase1_result["steps"]["notification_filter"] = {
+            "total_buzz": len(buzz_videos) if buzz_videos else 0,
+            "new_buzz": len(new_buzz_videos),
+            "already_notified": len(buzz_videos) - len(new_buzz_videos) if buzz_videos else 0
+        }
+
+        if self.config.notify_on_buzz and new_buzz_videos:
             try:
                 # MCP経由で通知準備（後でClaude CLI等から使用可能）
                 if MCP_NOTIFIER_AVAILABLE:
                     mcp_data = prepare_buzz_detection_email(
-                        videos=buzz_videos,
+                        videos=new_buzz_videos,
                         threshold=self.config.buzz_threshold
                     )
                     # MCPコマンドをJSONファイルとして保存
@@ -542,22 +601,25 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
                         "type": "mcp",
                         "status": "prepared",
                         "file": mcp_json_file,
-                        "video_count": len(buzz_videos)
+                        "video_count": len(new_buzz_videos)
                     }
 
                 # Google OAuth認証で実際にメール送信（EC2自動実行用）
                 logger.info(f"🔍 NOTIFIER_AVAILABLE = {NOTIFIER_AVAILABLE}")
                 if NOTIFIER_AVAILABLE:
-                    logger.info(f"📧 Calling notify_buzz_videos with {len(buzz_videos)} videos...")
+                    logger.info(f"📧 Calling notify_buzz_videos with {len(new_buzz_videos)} NEW videos...")
                     try:
                         notify_result = notify_buzz_videos(
-                            videos=buzz_videos,
+                            videos=new_buzz_videos,
                             threshold=self.config.buzz_threshold
                         )
-                        logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
+                        logger.info(f"📧 Buzz OAuth notification sent: {len(new_buzz_videos)} videos")
                         if "notification" not in phase1_result:
                             phase1_result["notification"] = {}
                         phase1_result["notification"]["oauth"] = notify_result
+
+                        # 通知成功後、動画を通知済みとしてマーク
+                        self._mark_videos_as_notified(new_buzz_videos)
                     except Exception as oauth_err:
                         logger.error(f"❌ OAuth notification error: {oauth_err}")
                         import traceback
@@ -566,6 +628,8 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
                 logger.error(f"❌ Buzz notification failed: {e}")
                 import traceback
                 logger.error(traceback.format_exc())
+        elif buzz_videos and not new_buzz_videos:
+            logger.info("📭 All buzz videos already notified, skipping notification")
 
         # Step 4: Google Sheetsに出力（バズ動画 + CSV全体）
         if SHEETS_LOGGER_AVAILABLE:
