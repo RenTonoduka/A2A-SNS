@@ -18,6 +18,7 @@ YOUTUBE_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 SNS_DIR = os.path.dirname(YOUTUBE_DIR)
 sys.path.insert(0, SNS_DIR)
 
+from contextlib import asynccontextmanager
 from _shared.a2a_base_server import A2ABaseServer, TaskSendRequest, Task, Part, Message, TaskStatus, Artifact
 from _shared.a2a_client import A2AClient, AgentRegistry
 
@@ -151,15 +152,29 @@ class MasterCoordinator(A2ABaseServer):
         self.last_reset_date = datetime.now().date()
         self.running = False
         self._scheduler_enabled = False  # 起動時に設定
+        self._pipeline_lock = asyncio.Lock()  # 並列実行防止
 
         # 追加ルート
         self._setup_orchestrator_routes()
 
-        # FastAPI起動時にスケジューラを開始
-        @self.app.on_event("startup")
-        async def on_startup():
-            if self._scheduler_enabled:
-                self.start_scheduler()
+        # lifespanイベントハンドラを設定
+        self._setup_lifespan()
+
+    def _setup_lifespan(self):
+        """lifespanイベントハンドラを設定"""
+        coordinator = self
+
+        @asynccontextmanager
+        async def lifespan(app):
+            # Startup
+            if coordinator._scheduler_enabled:
+                coordinator.start_scheduler()
+            yield
+            # Shutdown
+            coordinator.stop_scheduler()
+
+        # FastAPIアプリにlifespanを設定
+        self.app.router.lifespan_context = lifespan
 
     def _register_agents(self):
         """エージェントを登録"""
@@ -363,8 +378,27 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
             logger.info(f"📥 {agent_name} responded")
             return result
         except Exception as e:
-            logger.error(f"❌ {agent_name} failed: {e}")
-            return {"error": str(e), "status": {"state": "failed"}}
+            import traceback
+            error_msg = str(e) if str(e) else f"{type(e).__name__}: {traceback.format_exc()}"
+            logger.error(f"❌ {agent_name} failed: {error_msg}")
+
+            # エラー時にメール通知
+            self._notify_agent_error(agent_name, error_msg, message[:200])
+
+            return {"error": error_msg, "status": {"state": "failed"}}
+
+    def _notify_agent_error(self, agent_name: str, error: str, task_summary: str):
+        """エージェントエラー時にメール通知"""
+        try:
+            if NOTIFIER_AVAILABLE:
+                notify_pipeline_error(
+                    phase=f"Agent: {agent_name}",
+                    error=error,
+                    details=f"タスク概要: {task_summary}"
+                )
+                logger.info(f"📧 Error notification sent for {agent_name}")
+        except Exception as e:
+            logger.warning(f"Failed to send error notification: {e}")
 
     async def check_all_agents(self) -> Dict[str, bool]:
         """全エージェントの稼働状況を確認"""
@@ -486,10 +520,10 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
         else:
             phase1_result["result"] = {"message": "No buzz videos found"}
 
-        # バズ動画検出時に通知（MCP経由 + フォールバック）
+        # バズ動画検出時に通知（MCP準備 + OAuth送信）
         if self.config.notify_on_buzz and buzz_videos:
             try:
-                # MCP経由で通知準備（推奨）
+                # MCP経由で通知準備（後でClaude CLI等から使用可能）
                 if MCP_NOTIFIER_AVAILABLE:
                     mcp_data = prepare_buzz_detection_email(
                         videos=buzz_videos,
@@ -511,16 +545,27 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
                         "video_count": len(buzz_videos)
                     }
 
-                # Google OAuth認証フォールバック
-                elif NOTIFIER_AVAILABLE:
-                    notify_result = notify_buzz_videos(
-                        videos=buzz_videos,
-                        threshold=self.config.buzz_threshold
-                    )
-                    logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
-                    phase1_result["notification"] = notify_result
+                # Google OAuth認証で実際にメール送信（EC2自動実行用）
+                logger.info(f"🔍 NOTIFIER_AVAILABLE = {NOTIFIER_AVAILABLE}")
+                if NOTIFIER_AVAILABLE:
+                    logger.info(f"📧 Calling notify_buzz_videos with {len(buzz_videos)} videos...")
+                    try:
+                        notify_result = notify_buzz_videos(
+                            videos=buzz_videos,
+                            threshold=self.config.buzz_threshold
+                        )
+                        logger.info(f"📧 Buzz OAuth notification sent: {len(buzz_videos)} videos")
+                        if "notification" not in phase1_result:
+                            phase1_result["notification"] = {}
+                        phase1_result["notification"]["oauth"] = notify_result
+                    except Exception as oauth_err:
+                        logger.error(f"❌ OAuth notification error: {oauth_err}")
+                        import traceback
+                        logger.error(traceback.format_exc())
             except Exception as e:
                 logger.error(f"❌ Buzz notification failed: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
 
         # Step 4: Google Sheetsに出力（バズ動画 + CSV全体）
         if SHEETS_LOGGER_AVAILABLE:
@@ -689,8 +734,46 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
 
     async def run_full_pipeline(self, theme: Optional[str] = None) -> Dict[str, Any]:
         """フルパイプライン実行（Phase 1-4）"""
-        logger.info("🚀 Starting Full Pipeline...")
+        # ロックチェック - 並列実行防止
+        if self._pipeline_lock.locked():
+            logger.warning("⚠️ Pipeline already running, skipping...")
+            return {
+                "status": "skipped",
+                "reason": "Pipeline already running",
+                "message": "別のパイプラインが実行中です。完了後に再実行してください。"
+            }
 
+        async with self._pipeline_lock:
+            logger.info("🚀 Starting Full Pipeline...")
+            try:
+                return await self._run_full_pipeline_internal(theme)
+            except Exception as e:
+                import traceback
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                error_details = traceback.format_exc()
+                logger.error(f"❌ Pipeline failed with exception: {error_msg}")
+
+                # エラー通知をメールで送信
+                if NOTIFIER_AVAILABLE:
+                    try:
+                        notify_pipeline_error(
+                            phase="Full Pipeline",
+                            error=error_msg,
+                            details=f"Theme: {theme or 'auto'}\n\nTraceback:\n{error_details}"
+                        )
+                        logger.info("📧 Pipeline error notification sent")
+                    except Exception as notify_err:
+                        logger.warning(f"Failed to send error notification: {notify_err}")
+
+                return {
+                    "status": "error",
+                    "error": error_msg,
+                    "traceback": error_details,
+                    "theme": theme
+                }
+
+    async def _run_full_pipeline_internal(self, theme: Optional[str] = None) -> Dict[str, Any]:
+        """フルパイプライン実行の内部実装"""
         pipeline_result = {
             "started_at": datetime.now().isoformat(),
             "phases": {}
