@@ -1,0 +1,9 @@
+{
+  "buzz_videos": {
+    "error": "スプレッドシートIDが設定されていません。環境変数 YOUTUBE_SHEETS_ID を設定してください。"
+  },
+  "all_videos": {
+    "error": "スプレッドシートIDが設定されていません。環境変数 YOUTUBE_SHEETS_ID を設定してください。"
+  },
+  "timestamp": "2025-12-12T23:19:08.820130"
+}
