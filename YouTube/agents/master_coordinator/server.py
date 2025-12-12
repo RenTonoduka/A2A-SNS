@@ -637,10 +637,14 @@ YouTube台本生成システム全体（Phase 0-4）を統括し、完全自動�
                 logger.info("  └─ Step 4: Google Sheetsに出力...")
                 sheets_logger = get_sheets_logger()
 
-                # バズ動画を記録
-                if buzz_videos:
-                    logged_count = sheets_logger.log_buzz_videos(buzz_videos)
+                # バズ動画を記録（通知済みの新規動画のみ記録 - 重複防止）
+                # NOTE: new_buzz_videosは通知フィルター済みリスト（notified_videos.json でチェック済み）
+                # sheets_loggerにも同じリストを渡すことで、両方の重複チェックが同期される
+                if new_buzz_videos:
+                    logged_count = sheets_logger.log_buzz_videos(new_buzz_videos)
                     logger.info(f"    📊 {logged_count} new buzz videos logged to sheets cache")
+                elif buzz_videos:
+                    logger.info(f"    📊 Skipped logging {len(buzz_videos)} buzz videos (already notified)")
 
                 # videos.csvの全データをインポート
                 csv_path = os.path.join(YOUTUBE_DIR, "research", "data", "videos.csv")

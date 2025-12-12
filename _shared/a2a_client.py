@@ -10,9 +10,17 @@ from pydantic import BaseModel
 class A2AClient:
     """A2Aエージェントを呼び出すクライアント"""
 
-    def __init__(self, base_url: str, timeout: float = 300.0):
+    def __init__(self, base_url: str, timeout: float = 600.0):
         self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
+        # httpx.Timeoutで全タイムアウトを明示的に設定
+        # connect=30秒、read=600秒、write=600秒、pool=600秒
+        # LLM処理は時間がかかるため十分な待ち時間を確保
+        self.timeout = httpx.Timeout(
+            connect=30.0,
+            read=timeout,
+            write=timeout,
+            pool=timeout
+        )
         self._agent_card = None
 
     async def get_agent_card(self) -> dict:
@@ -20,7 +28,7 @@ class A2AClient:
         if self._agent_card:
             return self._agent_card
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
             response = await client.get(f"{self.base_url}/.well-known/agent.json")
             response.raise_for_status()
             self._agent_card = response.json()
