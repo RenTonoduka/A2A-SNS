@@ -146,12 +146,56 @@ aws ec2 authorize-security-group-ingress \
   --cidr "${MY_IP}/32" \
   --region $REGION > /dev/null
 
-# Allow all outbound
+# Outbound rules - restricted to necessary services only
+echo "  Setting up restricted outbound rules..."
+
+# Remove default allow-all egress rule
+DEFAULT_EGRESS=$(aws ec2 describe-security-groups \
+  --group-ids $SG_ID \
+  --region $REGION \
+  --query 'SecurityGroups[0].IpPermissionsEgress[?IpProtocol==`-1`].IpRanges[0].CidrIp' \
+  --output text 2>/dev/null)
+
+if [ "$DEFAULT_EGRESS" = "0.0.0.0/0" ]; then
+  aws ec2 revoke-security-group-egress \
+    --group-id $SG_ID \
+    --protocol -1 \
+    --cidr 0.0.0.0/0 \
+    --region $REGION 2>/dev/null || true
+fi
+
+# Allow HTTPS (443) outbound - for API calls (YouTube, Anthropic, etc.)
 aws ec2 authorize-security-group-egress \
   --group-id $SG_ID \
-  --protocol -1 \
+  --protocol tcp \
+  --port 443 \
   --cidr 0.0.0.0/0 \
   --region $REGION 2>/dev/null || true
+
+# Allow HTTP (80) outbound - for package updates
+aws ec2 authorize-security-group-egress \
+  --group-id $SG_ID \
+  --protocol tcp \
+  --port 80 \
+  --cidr 0.0.0.0/0 \
+  --region $REGION 2>/dev/null || true
+
+# Allow DNS (53) outbound
+aws ec2 authorize-security-group-egress \
+  --group-id $SG_ID \
+  --protocol udp \
+  --port 53 \
+  --cidr 0.0.0.0/0 \
+  --region $REGION 2>/dev/null || true
+
+aws ec2 authorize-security-group-egress \
+  --group-id $SG_ID \
+  --protocol tcp \
+  --port 53 \
+  --cidr 0.0.0.0/0 \
+  --region $REGION 2>/dev/null || true
+
+echo "  ✅ Outbound restricted to HTTPS/HTTP/DNS only"
 
 # -----------------------------------------------------------------------------
 # 6. Create Key Pair

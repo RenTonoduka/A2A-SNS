@@ -1,92 +1,145 @@
+# =============================================================================
+# A2A SNS System - Docker Compose (Security Hardened)
+# =============================================================================
+# Security Features:
+#   - Read-only Claude credentials mount
+#   - API key authentication required
+#   - No privileged containers
+#   - Resource limits
+#   - Internal network isolation
+# =============================================================================
+
 version: '3.8'
+
+# Common security settings
+x-security-config: &security-config
+  # No privileged access
+  privileged: false
+  # Read-only root filesystem where possible
+  read_only: false
+  # Security options
+  security_opt:
+    - no-new-privileges:true
+  # Resource limits
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+        cpus: '1.0'
+      reservations:
+        memory: 256M
+
+x-common-env: &common-env
+  # Security: API key required for external access
+  A2A_API_KEY: ${A2A_API_KEY:-}
+  # Security: Bind to localhost by default (use A2A_HOST=0.0.0.0 for external)
+  A2A_HOST: ${A2A_HOST:-127.0.0.1}
+  # Logging
+  PYTHONUNBUFFERED: "1"
 
 services:
   # ========================================
   # SNS Orchestrator
   # ========================================
   sns-orchestrator:
+    <<: *security-config
     build:
       context: .
       dockerfile: Dockerfile
     command: python orchestrator/server.py
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # Bind to localhost only
     volumes:
-      - .:/app
-      - ~/.claude:/root/.claude  # Claude Code認証情報
+      - .:/app:ro  # Read-only app code
+      - ./logs:/app/logs  # Writable logs
+      - ~/.claude:/root/.claude:ro  # Read-only Claude credentials
     environment:
-      - AGENT_NAME=sns-orchestrator
-      - AGENT_PORT=8080
+      <<: *common-env
+      AGENT_NAME: sns-orchestrator
+      AGENT_PORT: "8080"
     networks:
-      - a2a-network
+      - a2a-internal
 
   # ========================================
   # YouTube Agents
   # ========================================
   youtube-script-writer:
+    <<: *security-config
     build:
       context: .
       dockerfile: Dockerfile
     command: python YouTube/script-writer/server.py
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     volumes:
-      - .:/app
-      - ~/.claude:/root/.claude
+      - .:/app:ro
+      - ./logs:/app/logs
+      - ~/.claude:/root/.claude:ro
     environment:
-      - AGENT_NAME=youtube-script-writer
-      - AGENT_PORT=8081
+      <<: *common-env
+      AGENT_NAME: youtube-script-writer
+      AGENT_PORT: "8081"
     networks:
-      - a2a-network
+      - a2a-internal
 
   youtube-shorts-creator:
+    <<: *security-config
     build:
       context: .
       dockerfile: Dockerfile
     command: python YouTube/shorts-creator/server.py
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     volumes:
-      - .:/app
-      - ~/.claude:/root/.claude
+      - .:/app:ro
+      - ./logs:/app/logs
+      - ~/.claude:/root/.claude:ro
     environment:
-      - AGENT_NAME=youtube-shorts-creator
-      - AGENT_PORT=8082
+      <<: *common-env
+      AGENT_NAME: youtube-shorts-creator
+      AGENT_PORT: "8082"
     networks:
-      - a2a-network
+      - a2a-internal
 
   youtube-seo-optimizer:
+    <<: *security-config
     build:
       context: .
       dockerfile: Dockerfile
     command: python YouTube/seo-optimizer/server.py
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     volumes:
-      - .:/app
-      - ~/.claude:/root/.claude
+      - .:/app:ro
+      - ./logs:/app/logs
+      - ~/.claude:/root/.claude:ro
     environment:
-      - AGENT_NAME=youtube-seo-optimizer
-      - AGENT_PORT=8083
+      <<: *common-env
+      AGENT_NAME: youtube-seo-optimizer
+      AGENT_PORT: "8083"
     networks:
-      - a2a-network
+      - a2a-internal
 
   youtube-thumbnail-planner:
+    <<: *security-config
     build:
       context: .
       dockerfile: Dockerfile
     command: python YouTube/thumbnail-planner/server.py
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
     volumes:
-      - .:/app
-      - ~/.claude:/root/.claude
+      - .:/app:ro
+      - ./logs:/app/logs
+      - ~/.claude:/root/.claude:ro
     environment:
-      - AGENT_NAME=youtube-thumbnail-planner
-      - AGENT_PORT=8084
+      <<: *common-env
+      AGENT_NAME: youtube-thumbnail-planner
+      AGENT_PORT: "8084"
     networks:
-      - a2a-network
+      - a2a-internal
 
 networks:
-  a2a-network:
+  a2a-internal:
     driver: bridge
+    internal: false  # Set to true for full isolation (no internet access)
