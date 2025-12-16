@@ -9,6 +9,12 @@ credentials.json
 .env.production
 !.env.example
 
+# SSL Certificates (never commit private keys!)
+deploy/nginx/ssl/
+*.pem
+*.key
+*.crt
+
 # Python
 __pycache__/
 *.py[cod]

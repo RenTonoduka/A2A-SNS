@@ -258,6 +258,35 @@ services:
       retries: 3
 
 # ========================================
+# Nginx Reverse Proxy (HTTPS Termination)
+# ========================================
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/proxy_params:/etc/nginx/proxy_params:ro
+      - ./deploy/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - master-coordinator
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+
+# ========================================
 # Named Volumes
 # ========================================
 volumes:
@@ -267,6 +296,7 @@ volumes:
       type: none
       o: bind
       device: ${HOME}/.claude
+  nginx-logs:
 
 # ========================================
 # Networks
