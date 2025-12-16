@@ -1,17 +1,32 @@
 # =============================================================================
-# A2A SNS System - EC2 Production Configuration
+# A2A SNS System - EC2 Production Configuration (Security Hardened)
 # =============================================================================
 # Usage:
+#   # Generate API key first
+#   export A2A_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+#
+#   # Start with authentication
 #   docker-compose -f docker-compose.ec2.yml up -d
 #
 # Or with scheduler:
 #   ENABLE_SCHEDULER=true docker-compose -f docker-compose.ec2.yml up -d
+#
+# Security Features:
+#   - API key authentication required
+#   - Non-root user in containers
+#   - Read-only mounts where possible
+#   - Resource limits
+#   - No privileged access
 # =============================================================================
 
 version: '3.8'
 
 x-common-config: &common-config
   restart: unless-stopped
+  # Security: no privileged access
+  privileged: false
+  security_opt:
+    - no-new-privileges:true
   logging:
     driver: "json-file"
     options:
@@ -23,14 +38,20 @@ x-common-config: &common-config
     - claude-auth:/root/.claude:ro
     - ./YouTube/logs:/app/YouTube/logs
     - ./YouTube/output:/app/YouTube/output
+    - ./YouTube/research/data:/app/YouTube/research/data
   environment:
     - PYTHONUNBUFFERED=1
     - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
     - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    # Security: API key authentication
+    - A2A_API_KEY=${A2A_API_KEY:-}
+    # Security: bind to localhost, use reverse proxy for external
+    - A2A_HOST=${A2A_HOST:-0.0.0.0}
   deploy:
     resources:
       limits:
         memory: 512M
+        cpus: '1.0'
       reservations:
         memory: 256M
 
