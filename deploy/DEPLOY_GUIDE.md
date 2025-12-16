@@ -132,40 +132,108 @@ git clone https://github.com/YOUR_REPO/A2A-SNS.git .
 pip3 install -r _shared/requirements.txt
 ```
 
+### 🔒 セキュリティ設定（重要）
+
+```bash
+# 1. APIキーを生成
+export A2A_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+echo "Your API Key: $A2A_API_KEY"
+echo "export A2A_API_KEY=$A2A_API_KEY" >> ~/.bashrc
+
+# 2. 環境変数を設定
+cp .env.example .env
+nano .env  # 実際の値を設定
+
+# 必須設定:
+# - A2A_API_KEY=<生成したキー>
+# - GOOGLE_API_KEY=<YouTube API キー>
+```
+
 ### システム起動
 
 ```bash
-# Docker Compose で全エージェント起動
-docker-compose up -d
+# Docker Compose で全エージェント起動（EC2用設定）
+docker-compose -f docker-compose.ec2.yml up -d
 
 # ログ確認
-docker-compose logs -f
+docker-compose -f docker-compose.ec2.yml logs -f
 
 # 状態確認
-docker-compose ps
+docker-compose -f docker-compose.ec2.yml ps
 ```
 
 ---
 
-## Step 6: 動作確認
+## Step 6: HTTPS 設定（本番環境必須）
 
-### Agent Card 取得
+### 自己署名証明書（開発用）
 
 ```bash
-curl http://localhost:8080/.well-known/agent.json | jq
+cd deploy/nginx
+./generate-ssl.sh
 ```
 
-### タスク送信テスト
+### Let's Encrypt（本番用）
 
 ```bash
-curl -X POST http://localhost:8080/a2a/tasks/send \
+# ドメインのDNSをEC2のIPに向けてから実行
+sudo ./setup-letsencrypt.sh your-domain.com your-email@example.com
+```
+
+### nginx + HTTPS で起動
+
+```bash
+docker-compose -f docker-compose.ec2.yml up -d
+```
+
+---
+
+## Step 7: 動作確認
+
+### Agent Card 取得（認証不要）
+
+```bash
+# HTTP（開発用）
+curl http://localhost:8099/.well-known/agent.json | jq
+
+# HTTPS（本番用）
+curl https://your-domain.com/.well-known/agent.json | jq
+```
+
+### タスク送信テスト（認証必須）
+
+```bash
+# APIキーをヘッダーに付与
+curl -X POST http://localhost:8099/a2a/tasks/send \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $A2A_API_KEY" \
   -d '{
     "message": {
       "role": "user",
       "parts": [{"type": "text", "text": "テスト: Hello World"}]
     }
   }' | jq
+```
+
+### HTTPS経由（本番用）
+
+```bash
+curl -X POST https://your-domain.com/a2a/tasks/send \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $A2A_API_KEY" \
+  -d '{
+    "message": {
+      "role": "user",
+      "parts": [{"type": "text", "text": "バズ動画をチェック"}]
+    }
+  }' | jq
+```
+
+### ヘルスチェック
+
+```bash
+curl https://your-domain.com/health
+# {"status": "healthy"}
 ```
 
 ---
@@ -272,18 +340,51 @@ sudo kill -9 $(sudo lsof -t -i:8080)
 
 ## セキュリティ推奨事項
 
-1. **SSH キーのみ許可**（パスワード認証無効化）
-2. **Security Group**: 必要なIPのみ許可
-3. **Claude 認証情報**: EC2 外には持ち出さない
-4. **定期的なアップデート**: `sudo dnf update -y`
-5. **ログ監視**: CloudWatch Logs 連携推奨
+### 必須事項
+
+1. **API認証キー設定**: `A2A_API_KEY` 環境変数を必ず設定
+2. **HTTPS有効化**: Let's Encrypt で無料SSL証明書を取得
+3. **SSH キーのみ許可**（パスワード認証無効化）
+4. **Security Group**: 80/443 のみ公開、SSHは自分のIPのみ
+
+### 推奨事項
+
+5. **Claude 認証情報**: EC2 外には持ち出さない
+6. **定期的なアップデート**: `sudo dnf update -y`
+7. **ログ監視**: CloudWatch Logs 連携推奨
+8. **APIキーローテーション**: 定期的に新しいキーに変更
+
+### セキュリティチェックリスト
+
+```bash
+# 1. APIキーが設定されているか確認
+echo $A2A_API_KEY
+
+# 2. HTTPS証明書の有効期限確認
+openssl x509 -enddate -noout -in deploy/nginx/ssl/cert.pem
+
+# 3. 外部からのアクセステスト（認証なしは拒否されるべき）
+curl -X POST https://your-domain.com/a2a/tasks/send \
+  -H "Content-Type: application/json" \
+  -d '{"message":{"role":"user","parts":[{"type":"text","text":"test"}]}}'
+# Expected: 401 Unauthorized
+
+# 4. 認証ありでアクセス成功
+curl -X POST https://your-domain.com/a2a/tasks/send \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $A2A_API_KEY" \
+  -d '{"message":{"role":"user","parts":[{"type":"text","text":"test"}]}}'
+# Expected: 200 OK
+```
 
 ---
 
 ## 次のステップ
 
-- [ ] ドメイン設定（Route 53 + ALB）
-- [ ] HTTPS 対応（ACM + ALB）
+- [x] HTTPS 対応（Let's Encrypt）
+- [x] API認証（X-API-Key）
+- [x] レート制限（nginx + アプリ層）
+- [ ] ドメイン設定（Route 53）
 - [ ] Auto Scaling 設定
 - [ ] CloudWatch アラーム設定
 - [ ] バックアップ自動化
